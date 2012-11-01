@@ -54,12 +54,12 @@ class Datasource_Hybrid_Record {
 			$this->struct['array'] = 
 			$this->struct['datasource'] = array(); 
 		
-		$ids = DB::query(Database::SELECT, '
-			SELECT id
-			FROM dshfields, hybriddatasources
-			WHERE hybriddatasources.ds_id = :ds_id AND FIND_IN_SET(dshfields.ds_id, hybriddatasources.path) > 0
-		')
-			->param(':ds_id', $this->ds_id)
+		$ids = DB::select('id')
+			->from('dshfields', 'hybriddatasources')
+			->where('hybriddatasources.ds_id', '=', $this->ds_id)
+			->where(DB::expr('FIND_IN_SET(:f1, :f2)', array(
+				':f1' => 'dshfields.ds_id', ':f2' => 'hybriddatasources.path'
+			)), '>', 0)
 			->execute()
 			->as_array(NULL, 'id');
 		

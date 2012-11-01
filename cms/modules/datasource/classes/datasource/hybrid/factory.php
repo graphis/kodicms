@@ -387,7 +387,9 @@ class Datasource_Hybrid_Factory {
 		return DB::select(array('t2.ds_id', 'id'))
 			->from(array($this->table, 't1'), array($this->table, 't2'))
 			->where('t1.ds_id', '=', (int) $ds_id)
-			->where(DB::expr('INSTR(t2.ds_key, t1.ds_key)'), '=', 1)
+			->where(DB::expr('INSTR(:f1, :f2)', array(
+				':f1' => 't2.ds_key', ':f2' => 't1.ds_key'
+			)), '=', 1)
 			->order_by('t2.ds_key', 'desc')
 			->execute()
 			->as_array(NULL, 'id');
@@ -462,7 +464,7 @@ class Datasource_Hybrid_Factory {
 	public function remove_table($id) 
 	{
 		DB::query(NULL, 'DROP TABLE `:name`')
-			->param(':name', DB::expr($this->prefix . $id))
+			->param(':name', DB::expr( $this->prefix . $id))
 			->execute();
 		
 		return TRUE;

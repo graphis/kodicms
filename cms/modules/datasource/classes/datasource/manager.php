@@ -114,10 +114,10 @@ class Datasource_Manager {
 	 */
 	public static function exists($ds_id) 
 	{
-		return (bool) DB::query(Database::SELECT, '
-			SELECT ds_id FROM datasources WHERE ds_id = :ds_id LIMIT 1
-		')
-			->param(':ds_id', (int) $ds_id)
+		return (bool) DB::select('ds_id')
+			->from('datasources')
+			->where('ds_id', '=', (int) $ds_id)
+			->limit(1)
 			->execute()
 			->get('ds_id');
 	}
@@ -129,13 +129,13 @@ class Datasource_Manager {
 	 */
 	public static function get_info($ds_id) 
 	{
-		return DB::query(Database::SELECT, '
-			SELECT ds.ds_id AS id, ds_type AS type, name, description, internal, parent, ds_key, path
-			FROM datasources ds LEFT JOIN hybriddatasources hds ON (ds.ds_id = hds.ds_id)
-			WHERE ds.ds_id = :ds_id)
-			LIMIT 1
-		')
-			->param(':ds_id', (int) $ds_id)
+		return DB::select(array('ds.ds_id', 'id'), array('ds_type', 'type'), 'name', 'description')
+			->select('internal', 'parent', 'ds_key', 'path')
+			->from(array('datasources', 'ds'))
+			->join(array('hybriddatasources', 'hds'), 'left')
+				->on('ds.ds_id', '=', 'hds.ds_id')
+			->where('ds.ds_id', '=', (int) $ds_id)
+			->limit(1)
 			->execute()
 			->current();
 	}
@@ -155,12 +155,12 @@ class Datasource_Manager {
 	 */
 	public static function get_all_indexed() 
 	{
-		return DB::query(Database::SELECT, '
-			SELECT ds_id AS id, ds_type as type, name, description
-			FROM datasources
-			WHERE internal = 0 AND indexed != 0
-			ORDER BY name
-		')
+		return DB::select(array('ds_id', 'id'), array('ds_type', 'type'))
+			->select('name', 'description')
+			->from('datasources')
+			->where('internal', '=', 0)
+			->where('indexed', '!=', 0)
+			->order_by('name')
 			->cached()
 			->execute()
 			->as_array('id');

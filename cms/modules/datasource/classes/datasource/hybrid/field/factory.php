@@ -127,15 +127,15 @@ class DataSource_Hybrid_Field_Factory {
 		{
 			return $result;
 		}
-
-		$query = DB::query(Database::SELECT, 'SELECT dshfields.* FROM dshfields, hybriddatasources
-			WHERE 
-				id IN :ids AND 
-				dshfields.ds_id = hybriddatasources.ds_id
-			ORDER BY 
-			hybriddatasources.ds_key, dshfields.family DESC, dshfields.type, dshfields.header
-		')
-			->param(':ids', $ids)
+		
+		$query = DB::select('dshfields.*')
+			->from('dshfields', 'hybriddatasources')
+			->where('id', 'in', $ids)
+			->where('dshfields.ds_id', '=', DB::expr(':f', array(':f' => 'hybriddatasources.ds_id')))
+			->order_by('hybriddatasources.ds_key')
+			->order_by('dshfields.family', 'desc')
+			->order_by('dshfields.type')
+			->order_by('dshfields.header')
 			->execute();
 
 		if($query)
@@ -160,14 +160,25 @@ class DataSource_Hybrid_Field_Factory {
 
 		$result = array();
 		
-		$query = DB::query(Database::SELECT, 'SELECT dsf.* 
-			FROM hybriddatasources dsh0, hybriddatasources dsh, dshfields dsf
-			WHERE dsh0.ds_id = :ds_id 
-				AND (FIND_IN_SET(dsh.ds_id, dsh0.path) > 0 OR INSTR(dsh.ds_key, CONCAT(dsh0.ds_key, ".")) = 1)
-				AND dsh.ds_id = dsf.ds_id
-			ORDER BY 
-				dsh.ds_key, dsf.family, dsf.name ')
-			->param( ':ds_id', $ds_id )
+		$query = DDB::select('dsf.*')
+			->from(array('hybriddatasources', 'dsh0'))
+			->from(array('hybriddatasources', 'dsh'))
+			->from(array('dshfields', 'dsf'))
+			->where('dsh0.ds_id', '=', $ds_id)
+			->where_open()
+				->where(DB::expr('FIND_IN_SET(:f1, :f2)', array(
+					':f1' => 'dsh.ds_id', ':f2' => 'dsh0.path'
+				)), '>', 0)
+				->or_where(DB::expr('INSTR(:f1, :f2)', array(
+					':f1' => 'dsh.ds_key', ':f2' => DB::expr('CONCAT(:f1, ".")', array(
+						':f1' => 'dsh0.path'
+					))
+				)), '=', 1)
+			->where_close()
+			->where('dsh.ds_id', '=', DB::expr(':f', array(':f' => 'dsh.ds_id')))
+			->order_by('dsh.ds_key')
+			->order_by('dsf.family')
+			->order_by('dsf.name')
 			->execute();
 
 		if($query)
@@ -256,14 +267,15 @@ class DataSource_Hybrid_Field_Factory {
 	 */
 	public static function field_exists($key, $ds_id)
 	{
-		return (bool) DB::query(Database::SELECT, '
-			SELECT id 
-			FROM dshfields, hybriddatasources t1, hybriddatasources t2
-			WHERE t1.ds_id = :ds_id AND INSTR(t2.ds_key, t1.ds_key) = 1 AND dshfields.ds_id = t2.ds_id AND dshfields.name = :key
-			LIMIT 1
-		')
-			->param(':key', $key)
-			->param(':ds_id', $ds_id)
+		return (bool) DB::select('id')
+			->from('dshfields', array('hybriddatasources', 't1'), array('hybriddatasources', 't2'))
+			->where('t1.ds_id', '=', $ds_id)
+			->where(DB::expr('INSTR(:f1, :f2)', array(
+				':f1' => 't2.ds_key', ':f2' => 't1.ds_key'
+			)), '=', 1)
+			->where('dshfields.ds_id', '=', 't2.ds_id')
+			->where('dshfields.name', '=', $key)
+			->limit(1)
 			->execute()
 			->get('id');
 	}
@@ -287,7 +299,9 @@ class DataSource_Hybrid_Field_Factory {
 			$params[':default'] = DB::expr('DEFAULT "' .  $field->default . '"');
 		}
 		
-		return (bool) DB::query(NULL, 'ALTER TABLE `:table`  ADD `:key` :type :default')
+		return (bool) DB::query(NULL, 
+				'ALTER TABLE `:table`  ADD `:key` :type :default'
+			)
 			->parameters($params)
 			->execute();
 	}
@@ -304,7 +318,9 @@ class DataSource_Hybrid_Field_Factory {
 			':key' => DB::expr($field->name)
 		);
 
-		return (bool) DB::query(NULL, 'ALTER TABLE `:table` DROP `:key`')
+		return (bool) DB::query(NULL, 
+				'ALTER TABLE `:table` DROP `:key`'
+			)
 			->parameters($params)
 			->execute();
 	}
@@ -330,7 +346,9 @@ class DataSource_Hybrid_Field_Factory {
 		}
 		
 		echo debug::vars($params);
-		return (bool) DB::query(NULL, 'ALTER TABLE `:table` CHANGE `:old_key` `:new_key` :type :default')
+		return (bool) DB::query(NULL, 
+				'ALTER TABLE `:table` CHANGE `:old_key` `:new_key` :type :default'
+			)
 			->parameters($params)
 			->execute();
 	}
